@@ -6,6 +6,7 @@
 #include "ns3/wifi-module.h"
 #include "ns3/mobility-module.h"
 #include "ns3/netanim-module.h"
+#include "ns3/on-off-helper.h"
 
 #include <iostream>
 #include <fstream>
@@ -16,15 +17,12 @@
 
 using namespace ns3;
 
-
 NodeContainer nodes;
 /*
-	A1 --- AP1 --- B1==AUX
+	A1 --- AP1 --- B1
 */
 
-
 std::ofstream myfile;
-
 
 Ptr<PacketSink> B1; 
 double vazao;
@@ -52,7 +50,7 @@ int main(int argc, char *argv[]){
         cmd.AddValue ("nWifi", "Number of wifi STA devices", nWifi);
 	cmd.AddValue ("time", "Duração do teste", total);
 	cmd.AddValue ("dataRate", "dataRate", dataRate);
-  	cmd.AddValue ("round","Round",round);
+  	cmd.AddValue ("round", "Round", round);
         cmd.AddValue ("payloadSize", "Payload size in bytes", payloadSize);
   	cmd.Parse (argc, argv);
 
@@ -68,7 +66,7 @@ int main(int argc, char *argv[]){
         // Adiciona o prefixo ns3:: ao tcpVariant
 	tcpVariant = std::string ("ns3::") + tcpVariant;
 
-	//Cria os nós: nodes contem [A1,AP1,B1]
+	//Cria os nós: nodes contém [A1,AP1,B1]
 	NodeContainer nodes;
 	nodes.Create(3);
 
@@ -130,7 +128,7 @@ int main(int argc, char *argv[]){
         //portas usadas tanto para o source quanto para 
 	uint16_t port = 8080; 
 
-        
+        /*        
         // BulkSendApplication - Vou enviar o máximo de tráfego possível para o B
         BulkSendHelper source ("ns3::TcpSocketFactory", InetSocketAddress (interfaces.GetAddress(2), port));
 	source.SetAttribute ("MaxBytes", UintegerValue(0));
@@ -139,7 +137,18 @@ int main(int argc, char *argv[]){
 	ApplicationContainer sourceApps = source.Install(nodes.Get (0));
 	sourceApps.Start (Seconds (1.0));
 	sourceApps.Stop (Seconds (total));
-        
+        */
+                
+        /* Install TCP/UDP Transmitter on the station */
+        OnOffHelper server ("ns3::TcpSocketFactory", InetSocketAddress (interfaces.GetAddress(2), port));
+        server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
+        server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
+        server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
+        server.SetAttribute ("DataRate", DataRateValue (DataRate (dataRate)));
+        ApplicationContainer sourceApps = server.Install (nodes.Get(0)); 
+	sourceApps.Start (Seconds (1.0));
+	sourceApps.Stop (Seconds (total));
+
         // PacketSink - Receive and consume traffic generated to an IP address and port
 	PacketSinkHelper sink ("ns3::TcpSocketFactory",InetSocketAddress (Ipv4Address::GetAny(), port));
 
