@@ -15,28 +15,34 @@
 #define DEBUG true
 #endif
 
+#define MAX_STA 3
+
 using namespace ns3;
 
 NodeContainer nodes;
 /*
-	A1 --- AP1 --- B1
+        <--- A
+    AP  <--- B
+        <--- C
+
+    Clientes enviam dados para AP (sink).
+    Número de clientes varia de 1 a 3 (MAX_STA).
 */
 
 std::ofstream myfile;
 
-Ptr<PacketSink> B1; 
+Ptr<PacketSink> PS; 
 double vazao;
 uint64_t ultimoRX=0;
 void calcVazao(){
-	vazao = (B1->GetTotalRx () - ultimoRX) *  8.0 / 1e6;     
-	ultimoRX = B1->GetTotalRx ();
+	vazao = (PS->GetTotalRx () - ultimoRX) *  8.0 / 1e6;     
+	ultimoRX = PS->GetTotalRx ();
   	std::cout <<vazao<< std::endl;
   	myfile <<vazao<< std::endl;
 	Simulator::Schedule (MilliSeconds (1000), &calcVazao);
 }
 
 int main(int argc, char *argv[]){
-
     // Variáveis e seus valores default
 	std::string tcpVariant =  "TcpNewReno";
 	std::string protocol   =  "n";
@@ -44,11 +50,11 @@ int main(int argc, char *argv[]){
     std::string dataRate = "10Mbps";
 	double total = 60.0;
 	int round = 1;
-    uint32_t nWifi = 3;
+    int nSta = 1;
 
     // Add a program argument        
 	CommandLine cmd;
-    cmd.AddValue ("nWifi", "Number of wifi STA devices", nWifi);
+    cmd.AddValue ("nSta", "Número de estações conectadas ao AP (1-3)", nSta);
     cmd.AddValue ("protocol", "802.11n or 802.11ac (n/ac)", protocol);
 	cmd.AddValue ("time", "Duração do teste", total);
 	cmd.AddValue ("dataRate", "dataRate", dataRate);
@@ -68,10 +74,6 @@ int main(int argc, char *argv[]){
     // Adiciona o prefixo ns3:: ao tcpVariant
 	tcpVariant = std::string ("ns3::") + tcpVariant;
 
-	//Cria os nós: nodes contém [A1, AP1, B1]
-	NodeContainer nodes;
-	nodes.Create(3);
-
 	YansWifiChannelHelper channel = YansWifiChannelHelper::Default ();
 	channel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
 
@@ -81,6 +83,7 @@ int main(int argc, char *argv[]){
 	
 	WifiMacHelper mac;
 
+    // Defino o protocolo (IEEE 802.11n ou 802.11ac) pelo argumento de linha de comando "protocol"
 	WifiHelper wifi;
     if (protocol.compare("n")){
         wifi.SetStandard (WIFI_PHY_STANDARD_80211n_5GHZ);
@@ -89,19 +92,25 @@ int main(int argc, char *argv[]){
     }
 
 	wifi.SetRemoteStationManager ("ns3::IdealWifiManager");
+
+
+	//Cria os nós: nodes contém [AP, A, B, C]
+	NodeContainer nodes;
+	nodes.Create(1 + nSta);
 	
 	NetDeviceContainer devices;
 
-	mac.SetType ("ns3::StaWifiMac");
-	devices=(wifi.Install (phy, mac, nodes.Get(0)));
-	devices.Add(wifi.Install (phy, mac, nodes.Get(1)));
 	mac.SetType ("ns3::ApWifiMac");
-	devices.Add(wifi.Install (phy, mac, nodes.Get(2)));
+	devices=(wifi.Install (phy, mac, nodes.Get(0)));
 
+	mac.SetType ("ns3::StaWifiMac");
+    for (int i=1; i<= nSta; i++){ // para nSta=3: 1,2,3 | para nSta=2: 1,2 | para nSta=1: 1
+	    devices.Add(wifi.Install (phy, mac, nodes.Get(i)));
+    }
 
 	if(DEBUG)std::cout<<"Devices = "<<devices.GetN()<<"\n";
 
-    //Na verdade não preciso dessa comparação, mas não quis mexer.
+    // Na verdade não preciso dessa comparação, mas não quis mexer.
 	if (tcpVariant.compare ("ns3::TcpWestwoodPlus") == 0){ 
 		Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpWestwood::GetTypeId ()));
 		Config::SetDefault ("ns3::TcpWestwood::ProtocolType", EnumValue (TcpWestwood::WESTWOODPLUS));
@@ -123,9 +132,10 @@ int main(int argc, char *argv[]){
     //Define a posição de cada nó. Todos são fixos, não tem movimentação.
 	MobilityHelper mobility;
 	Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
-	positionAlloc->Add (Vector (0.0, 0.0, 0.0));
-	positionAlloc->Add (Vector (0.1, 0.0, 0.0));
-	positionAlloc->Add (Vector (0.2, 0.0, 0.0));
+	positionAlloc->Add (Vector (0.0, 0.1, 0.0)); // AP
+	positionAlloc->Add (Vector (0.1, 0.2, 0.0)); // A
+	positionAlloc->Add (Vector (0.1, 0.1, 0.0)); // B
+  	positionAlloc->Add (Vector (0.1, 0.0, 0.0)); // C
 	mobility.SetPositionAllocator (positionAlloc);
 	mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
 	mobility.Install(nodes);
@@ -133,25 +143,28 @@ int main(int argc, char *argv[]){
     //portas usadas tanto para o source quanto para 
 	uint16_t port = 8080; 
 
-    /* Install TCP/UDP Transmitter on the station */
-    OnOffHelper server ("ns3::TcpSocketFactory", InetSocketAddress (interfaces.GetAddress(2), port));
-    server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
-    server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
-    server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
-    server.SetAttribute ("DataRate", DataRateValue (DataRate (dataRate)));
-    ApplicationContainer sourceApps = server.Install (nodes.Get(0)); 
-	sourceApps.Start (Seconds (1.0));
-	sourceApps.Stop (Seconds (total));
+    // Instala o transmissor nos nós A, B e C, dependendo do nSta
+    for(int i=1; i<=nSta; i++){
+        // Envia pro AP (endereço 0)
+        OnOffHelper server ("ns3::TcpSocketFactory", InetSocketAddress(interfaces.GetAddress(0), port));
+        server.SetAttribute ("PacketSize", UintegerValue (payloadSize));
+        server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
+        server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
+        server.SetAttribute ("DataRate", DataRateValue (DataRate (dataRate)));
+        ApplicationContainer sourceApps = server.Install (nodes.Get(i));
+	    sourceApps.Start (Seconds(1.0));
+	    sourceApps.Stop (Seconds(total));
+    }
 
     // PacketSink - Receive and consume traffic generated to an IP address and port
-	PacketSinkHelper sink ("ns3::TcpSocketFactory",InetSocketAddress (Ipv4Address::GetAny(), port));
+	PacketSinkHelper sink ("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), port) );
 
-    // Define aplicação para o sink [B]
-	ApplicationContainer sinkApps = sink.Install (nodes.Get(2));
-	sinkApps.Start (Seconds (0.0));
-	sinkApps.Stop (Seconds (total));
+    // Define aplicação para o sink [AP]
+	ApplicationContainer sinkApps = sink.Install (nodes.Get(0));
+	sinkApps.Start (Seconds(0.0));
+	sinkApps.Stop (Seconds(total));
 
-	B1 = StaticCast<PacketSink> (sinkApps.Get (0));
+	PS = StaticCast<PacketSink>(sinkApps.Get (0));
 
 	if(DEBUG)Simulator::Schedule (Seconds (2), &calcVazao);
 
@@ -159,7 +172,7 @@ int main(int argc, char *argv[]){
   	Simulator::Run();
   	Simulator::Destroy ();
 	
-	myfile <<((B1->GetTotalRx () * 8) / (1e6  * (total-1)))<< std::endl;
+	myfile <<((PS->GetTotalRx () * 8) / (1e6  * (total-1)))<< std::endl;
 	myfile.close();
 	return 0;
 }
