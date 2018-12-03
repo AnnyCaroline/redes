@@ -52,16 +52,14 @@ int main(int argc, char *argv[]){
     std::string dataRate = "100Mbps";
 	double total = 60.0;
  	int round = 1;
-    int nSta = 1;
 
     // Add a program argument        
 	CommandLine cmd;
-    cmd.AddValue ("nSta", "Número de estações conectadas ao AP (1-3)", nSta);
-    cmd.AddValue ("protocol", "802.11n or 802.11ac (n/ac)", protocol);
+        cmd.AddValue ("protocol", "802.11n or 802.11ac (n/ac)", protocol);
 	cmd.AddValue ("time", "Duração do teste", total);
 	cmd.AddValue ("dataRate", "dataRate", dataRate);
   	cmd.AddValue ("round", "Round", round);
-    cmd.AddValue ("payloadSize", "Payload size in bytes", payloadSize);
+        cmd.AddValue ("payloadSize", "Payload size in bytes", payloadSize);
   	cmd.Parse (argc, argv);
 
     // Semente e rodada
@@ -168,6 +166,7 @@ int main(int argc, char *argv[]){
   	Simulator::Destroy ();
 	
 	myfile <<((PS->GetTotalRx () * 8) / (1e6  * (total-1)))<< std::endl;
+        std::cout <<"Media: " << ((PS->GetTotalRx () * 8) / (1e6  * (total-1)))<< std::endl;
 	myfile.close();
 	return 0;
 }

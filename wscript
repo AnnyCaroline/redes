@@ -6,4 +6,3 @@ def build(bld):
 
     obj = bld.create_ns3_program('redes', ['internet', 'mobility', 'wifi', 'applications', 'point-to-point'])    
     obj.source = 'redes.cc'
-
