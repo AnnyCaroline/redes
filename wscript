@@ -6,3 +6,6 @@ def build(bld):
 
     obj = bld.create_ns3_program('redes', ['internet', 'mobility', 'wifi', 'applications', 'point-to-point'])    
     obj.source = 'redes.cc'
+
+    obj = bld.create_ns3_program('redes-adhoc', ['internet', 'mobility', 'wifi', 'applications', 'point-to-point'])    
+    obj.source = 'redes-adhoc.cc'

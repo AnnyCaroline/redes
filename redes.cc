@@ -50,30 +50,26 @@
  NS_LOG_COMPONENT_DEFINE ("wifi-tcp");
 
  
- using namespace ns3;
+using namespace ns3;
+
+Ptr<PacketSink> sink;                         /* Pointer to the packet sink application */
+uint64_t lastTotalRx = 0;                     /* The value of the last total received bytes */
+std::ofstream myfile;
+
+void CalculateThroughput(){
+    Time now = Simulator::Now ();                                         /* Return the simulator's virtual time. */
+    double cur = (sink->GetTotalRx() - lastTotalRx) * 8.0 / 1e6;     /* Convert Application RX Packets to MBits. */
+    std::cout << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
+    myfile << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
+    lastTotalRx = sink->GetTotalRx();
+    Simulator::Schedule (MilliSeconds(1000), &CalculateThroughput);
+}
  
- Ptr<PacketSink> sink;                         /* Pointer to the packet sink application */
- uint64_t lastTotalRx = 0;                     /* The value of the last total received bytes */
- std::ofstream myfile;
- 
- void CalculateThroughput ()
- {
-   Time now = Simulator::Now ();                                         /* Return the simulator's virtual time. */
-   double cur = (sink->GetTotalRx() - lastTotalRx) * 8.0 / 1e6;     /* Convert Application RX Packets to MBits. */
-   std::cout << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
-   myfile << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
-   lastTotalRx = sink->GetTotalRx();
-   Simulator::Schedule (MilliSeconds(1000), &CalculateThroughput);
- }
- 
- int
- main (int argc, char *argv[])
- {
+int main (int argc, char *argv[]){
    uint32_t payloadSize = 1472;                       /* Transport layer payload size in bytes. */
-   std::string dataRate = "100Mbps";                  /* Application layer datarate. */
-    std::string protocol   =  "n";
+   std::string protocol   =  "n";
    std::string tcpVariant = "TcpWestwoodPlus";             /* TCP variant type. */
-   std::string phyRate = "OfdmRate6Mbps";             /* Physical layer bitrate. */
+   std::string phyRate = "HtMcs0";             /* Physical layer bitrate. */
    double simulationTime = 10;                        /* Simulation time in seconds. */
    bool pcapTracing = false;                          /* PCAP Tracing is enabled or not. */
    int round = 1;
@@ -82,7 +78,6 @@
    CommandLine cmd;
    cmd.AddValue ("payloadSize", "Payload size in bytes", payloadSize);
    cmd.AddValue ("protocol", "802.11n or 802.11ac (n/ac)", protocol);
-   cmd.AddValue ("dataRate", "Application data ate", dataRate);
    cmd.AddValue ("round", "Round", round);
    cmd.AddValue ("tcpVariant", "Transport protocol to use: TcpNewReno, "
                  "TcpHybla, TcpHighSpeed, TcpHtcp, TcpVegas, TcpScalable, TcpVeno, "
@@ -120,10 +115,10 @@
    WifiHelper wifiHelper;
     if (protocol.compare("n") == 0){
         std::cout << "n" << std::endl;
-        wifiHelper.SetStandard (WIFI_PHY_STANDARD_80211n_5GHZ);
+        wifiHelper.SetStandard(WIFI_PHY_STANDARD_80211n_5GHZ);
     }else{
         std::cout << "ac" << std::endl;
-        wifiHelper.SetStandard (WIFI_PHY_STANDARD_80211ac); //IEEE 802.11ac operates in 5 GHz                
+        wifiHelper.SetStandard(WIFI_PHY_STANDARD_80211ac); //IEEE 802.11ac operates in 5 GHz                
     }
  
    /* Set up Legacy Channel */
@@ -138,7 +133,6 @@
    wifiHelper.SetRemoteStationManager ("ns3::ConstantRateWifiManager",
                                        "DataMode", StringValue (phyRate),
                                        "ControlMode", StringValue (phyRate));
- 
 
 	//Cria os nós: nodes contém [AP, STA]
 	NodeContainer nodes;
@@ -151,12 +145,15 @@
 
 	wifiMac.SetType ("ns3::StaWifiMac");
     devices.Add(wifiHelper.Install (wifiPhy, wifiMac, nodes.Get(1)));
+
+
+  Config::Set ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/ChannelWidth", UintegerValue (40)); //ou 40
  
    /* Mobility model */
    MobilityHelper mobility;
    Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
    positionAlloc->Add (Vector (0.0, 0.0, 0.0));
-   positionAlloc->Add (Vector (1.0, 1.0, 0.0));
+   positionAlloc->Add (Vector (5.0, 5.0, 0.0));
  
    mobility.SetPositionAllocator (positionAlloc);
    mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
@@ -184,13 +181,24 @@
    sink = StaticCast<PacketSink>(sinkApp.Get (0));
 
     // Transmitter no STA
-    BulkSendHelper source ("ns3::TcpSocketFactory",InetSocketAddress (interfaces.GetAddress(0), 9));	
+    /*
+        BulkSendHelper source ("ns3::TcpSocketFactory",InetSocketAddress (interfaces.GetAddress(0), 9));	
 	ApplicationContainer sourceApps = source.Install(nodes.Get(1));//instalo no STA
 	sourceApps.Start (Seconds(1.0));
 	sourceApps.Stop (Seconds(simulationTime));
+    */
 
+
+   OnOffHelper server ("ns3::TcpSocketFactory", (InetSocketAddress (interfaces.GetAddress(0), 9)));
+   server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
+   server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
+   //server.SetAttribute ("DataRate", DataRateValue(DataRate("200Mbps")));
+   server.SetConstantRate (DataRate ("200Mb/s"), 1420);
+   ApplicationContainer sourceApps = server.Install(nodes.Get(1));
+   sourceApps.Start (Seconds(1.0));
+   sourceApps.Stop (Seconds(simulationTime));
  
-   /* Start Simulation */
+   /* Start Simulation */ 
    Simulator::Schedule(Seconds(2), &CalculateThroughput);
    Simulator::Stop(Seconds (simulationTime+1));
    Simulator::Run();
@@ -202,7 +210,6 @@
    std::cout << "\nAverage throughput: " << averageThroughput << " Mbit/s" << std::endl;
    myfile << "\nAverage throughput: " << averageThroughput << " Mbit/s" << std::endl;
     
-
    myfile.close();
    return 0;
  }
