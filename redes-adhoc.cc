@@ -24,7 +24,7 @@
 *   ------------------
 *
 *   Árvore 1
-*   0(192.92.236.1 - sink)
+*      0(192.92.236.1)
 *             |
 *      1(192.92.236.2)
 *             |
@@ -37,20 +37,20 @@
 *
 *
 *   Árvore 2
-*                    0(192.92.236.1 - sink)
-*                     /                 \
-*             1(192.92.236.2)      2(192.92.236.3)
+*                      0(192.92.236.1)
+*                     /              \
+*             1(192.92.236.2)   2(192.92.236.3)
 *              /          \
 *   3(192.92.236.4)  4(192.92.236.5)
 *
 *
 *
 *  Árvore 3
-*                           0(192.92.236.1 - sink)
-*                             |  |            |  |
-*           __________________|  |            |  |_____________
-*          /                     |            |                \
-*   1(192.92.236.2)     2(192.92.236.3)   3(192.92.236.4)  4(192.92.236.5)
+*                            0(192.92.236.1)
+*                            | |         | |
+*                  __________| |         | |_________
+*                 /            |         |           \
+*   1(192.92.236.2) 2(192.92.236.3) 3(192.92.236.4) 4(192.92.236.5)
 *
 *
 * Nessa simulação, todos os filhos (todos os nós menos o 0), enviam dados para o nó raiz (0).
@@ -69,43 +69,47 @@
 #include "ns3/on-off-helper.h"
 #include "ns3/yans-wifi-channel.h"
 #include "ns3/mobility-model.h"
-#include "ns3/packet-sink.h"
-#include "ns3/packet-sink-helper.h"
-#include "ns3/tcp-westwood.h"
 #include "ns3/internet-stack-helper.h"
 #include "ns3/ipv4-address-helper.h"
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/ipv4-static-routing-helper.h"
 #include "ns3/ipv4-list-routing-helper.h"
+
+#include "ns3/packet-sink.h"
+#include "ns3/packet-sink-helper.h"
  
 NS_LOG_COMPONENT_DEFINE ("wifi-tree");
  
 using namespace ns3;
- 
-Ptr<PacketSink> sink;     // ponteiro para o nó sink, nó raiz
+
+const int port = 9; 
+Ptr<PacketSink> raizPtr; // Ponteiro para o nó raiz
 uint64_t lastTotalRx = 0; // O valor para o último total de bytes recebidos
 std::ofstream myfile;
+
 
 void CalculateThroughput(){
     //Simulator::Now obtém o tempo virtula do simulador
     Time now = Simulator::Now ();
 
     // Converte os pacotes recebidos para MBits
-    double cur = (sink->GetTotalRx() - lastTotalRx) * 8.0 / 1e6;
+    double cur = (raizPtr->GetTotalRx() - lastTotalRx) * 8.0 / 1e6;
     
     // Imprime a vazão atual
     std::cout << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
     myfile << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
     
-    lastTotalRx = sink->GetTotalRx();
+    lastTotalRx = raizPtr->GetTotalRx();
     
     //Executará a rotina novamente depois de 1s
     Simulator::Schedule (MilliSeconds(1000), &CalculateThroughput);
 }
  
 int main (int argc, char *argv[]){
+    LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
+    //LogComponentEnable ("UdpEchoerverApplication", LOG_LEVEL_INFO);
+
     uint32_t payloadSize = 1472;                /* Transport layer payload size in bytes. */
-    std::string tcpVariant = "TcpWestwoodPlus"; /* TCP variant type. */
     std::string phyRate = "OfdmRate54Mbps";     /* Physical layer bitrate. */
     double simulationTime = 10;                 /* Simulation time in seconds. */
     bool pcapTracing = false;                   /* PCAP Tracing is enabled or not. */
@@ -127,23 +131,6 @@ int main (int argc, char *argv[]){
     std::cout << filename << std::endl;
     myfile.open(filename);
 
-    tcpVariant = std::string ("ns3::") + tcpVariant;
-    // Select TCP variant
-    if (tcpVariant.compare ("ns3::TcpWestwoodPlus") == 0){
-       // TcpWestwoodPlus is not an actual TypeId name; we need TcpWestwood here
-       Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TcpWestwood::GetTypeId ()));
-       // the default protocol type in ns3::TcpWestwood is WESTWOOD
-       Config::SetDefault ("ns3::TcpWestwood::ProtocolType", EnumValue (TcpWestwood::WESTWOODPLUS));
-    }
-    else{
-        TypeId tcpTid;
-        NS_ABORT_MSG_UNLESS (TypeId::LookupByNameFailSafe (tcpVariant, &tcpTid), "TypeId " << tcpVariant << " not found");
-        Config::SetDefault ("ns3::TcpL4Protocol::SocketType", TypeIdValue (TypeId::LookupByName (tcpVariant)));
-    }
- 
-    /* Configure TCP Options */
-    Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (payloadSize));
-
     WifiMacHelper wifiMac;
     WifiHelper wifiHelper;
     wifiHelper.SetStandard(WIFI_PHY_STANDARD_80211n_5GHZ);
@@ -160,18 +147,20 @@ int main (int argc, char *argv[]){
     wifiHelper.SetRemoteStationManager("ns3::ConstantRateWifiManager");
 
 	//Cria os nós: nodes contém [AP, STA]
-	NodeContainer nodes;
-	nodes.Create(5);
+
+    NodeContainer raiz;
+    raiz.Create(1);
+
+    NodeContainer filhos;
+    filhos.Create(4);
+
+    // nodes é a concatenação do container "raiz" com o "filhos"
+	NodeContainer nodes(raiz, filhos);
 
     NetDeviceContainer devices;
 
     wifiMac.SetType("ns3::AdhocWifiMac");
     devices = (wifiHelper.Install (wifiPhy, wifiMac, nodes));
-    /*devices.Add (wifiHelper.Install (wifiPhy, wifiMac, nodes.Get(1)));
-    devices.Add (wifiHelper.Install (wifiPhy, wifiMac, nodes.Get(2)));
-    devices.Add (wifiHelper.Install (wifiPhy, wifiMac, nodes.Get(3)));
-    devices.Add (wifiHelper.Install (wifiPhy, wifiMac, nodes.Get(4)));
-    */
 
     //altera a banda
     Config::Set ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/ChannelWidth", UintegerValue (40)); //ou 40
@@ -251,45 +240,33 @@ int main (int argc, char *argv[]){
         staticRouting4->AddHostRouteTo(Ipv4Address ("192.168.1.1"), Ipv4Address ("192.168.1.1"), 1);        
     }
 
-    /* Sink no nó raiz - 0 */
+    // UdpEchoServer no nó raiz - 0
+    UdpEchoServerHelper echoServer(port);
+    ApplicationContainer raizApp = echoServer.Install(raiz);
+    raizApp.Start(Seconds(0.0));
+    raizApp.Stop(Seconds(simulationTime));
+
     PacketSinkHelper sinkHelper ("ns3::TcpSocketFactory", InetSocketAddress (Ipv4Address::GetAny(), 9));
-    ApplicationContainer sinkApp = sinkHelper.Install (nodes.Get(0)); //raiz
-    sinkApp.Start(Seconds(0.0));
+    ApplicationContainer sinkApp = sinkHelper.Install (raiz); //AP
+    sinkApp.Start(Seconds (0.0));
     sinkApp.Stop(Seconds(simulationTime));
-    sink = StaticCast<PacketSink>(sinkApp.Get (0));
+    raizPtr = StaticCast<PacketSink>(sinkApp.Get (0));    
 
-    // Transmitter no STA
-    /*
-    BulkSendHelper source ("ns3::TcpSocketFactory",InetSocketAddress (interfaces.GetAddress(0), 9));	
-    ApplicationContainer sourceApps = source.Install(nodes.Get(1));//instalo no STA
-    sourceApps.Start (Seconds(1.0));
-    sourceApps.Stop (Seconds(simulationTime));
-    */
-
-    // Transmissores nos nós 1~4 (enviam para o raiz-0)
-        OnOffHelper server ("ns3::TcpSocketFactory", (InetSocketAddress (interfaces.GetAddress(0), 9)));
-        server.SetAttribute ("OnTime", StringValue ("ns3::ConstantRandomVariable[Constant=1]"));
-        server.SetAttribute ("OffTime", StringValue ("ns3::ConstantRandomVariable[Constant=0]"));
-        server.SetConstantRate (DataRate ("200Mb/s"), payloadSize);
-        NodeContainer filhos;
-        filhos.Add(nodes.Get(1));
-        filhos.Add(nodes.Get(2));
-        filhos.Add(nodes.Get(3));
-        filhos.Add(nodes.Get(4));
-        ApplicationContainer sourceApps = server.Install(filhos);
-    /*for(int i=1; i<5; i++){    
-        
-    }*/
-
-    sourceApps.Start (Seconds(1.0));
-    sourceApps.Stop (Seconds(simulationTime));
+    // UdpEchoClient nos nós filhos (enviando para o raiz=0)
+    UdpEchoClientHelper echoClient (interfaces.GetAddress(0), port);
+    echoClient.SetAttribute("MaxPackets", UintegerValue(2));
+    echoClient.SetAttribute("Interval", TimeValue (Seconds(1.0)));
+    echoClient.SetAttribute("PacketSize", UintegerValue(1024));
+    ApplicationContainer filhosApp = echoClient.Install(filhos.Get(0));
+    filhosApp.Start(Seconds(1.0));
+    filhosApp.Stop(Seconds(simulationTime));
  
     /* Start Simulation */ 
     Simulator::Schedule(Seconds(2), &CalculateThroughput);
     Simulator::Stop(Seconds (simulationTime+1));
     Simulator::Run();
 
-    double averageThroughput = ((sink->GetTotalRx () * 8) / (1e6 * (simulationTime-1)));
+    double averageThroughput = ((raizPtr->GetTotalRx () * 8) / (1e6 * (simulationTime-1)));
 
     Simulator::Destroy ();
 
