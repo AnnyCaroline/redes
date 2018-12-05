@@ -106,6 +106,7 @@ private:
 class RequestResponseClientHelper
 {
 public:
+
   /**
    * Create RequestResponseClientHelper which will make life easier for people trying
    * to set up simulations with echos. Use this variant with addresses that do

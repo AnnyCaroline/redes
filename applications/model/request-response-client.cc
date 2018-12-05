@@ -47,7 +47,7 @@ RequestResponseClient::GetTypeId (void)
                    UintegerValue (100),
                    MakeUintegerAccessor (&RequestResponseClient::m_count),
                    MakeUintegerChecker<uint32_t> ())
-    .AddAttribute ("Interval",
+    .AddAttribute ("Interval", 
                    "The time to wait between packets",
                    TimeValue (Seconds (1.0)),
                    MakeTimeAccessor (&RequestResponseClient::m_interval),
@@ -61,7 +61,7 @@ RequestResponseClient::GetTypeId (void)
                    "The destination port of the outbound packets",
                    UintegerValue (0),
                    MakeUintegerAccessor (&RequestResponseClient::m_peerPort),
-                   MakeUintegerChecker<uint16_t> ())
+                   MakeUintegerChecker<uint16_t> ())        
     .AddAttribute ("PacketSize", "Size of echo data in outbound packets",
                    UintegerValue (100),
                    MakeUintegerAccessor (&RequestResponseClient::SetDataSize,
@@ -78,7 +78,6 @@ RequestResponseClient::RequestResponseClient ()
 {
   NS_LOG_FUNCTION (this);
   m_sent = 0;
-  m_received = 0;
   m_socket = 0;
   m_sendEvent = EventId ();
   m_data = 0;
@@ -194,10 +193,11 @@ RequestResponseClient::SetDataSize (uint32_t dataSize)
   // that she doesn't care about the contents of the packet at all, so 
   // neither will we.
   //
+
   delete [] m_data;
-  m_data = 0;
-  m_dataSize = 0;
+  m_dataSize = dataSize;
   m_size = dataSize;
+  m_data = new uint8_t[m_dataSize];  
 }
 
 uint32_t 
@@ -206,6 +206,14 @@ RequestResponseClient::GetDataSize (void) const
   NS_LOG_FUNCTION (this);
   return m_size;
 }
+
+uint32_t 
+RequestResponseClient::GetPacketsSent (void) const
+{  
+  NS_LOG_FUNCTION (this);
+  return m_sent;
+}
+
 
 void 
 RequestResponseClient::SetFill (std::string fill)
@@ -335,22 +343,22 @@ RequestResponseClient::Send (void)
   if (Ipv4Address::IsMatchingType (m_peerAddress))
     {
       NS_LOG_INFO ("At time " << Simulator::Now ().GetSeconds () << "s client sent " << m_size << " bytes to " <<
-                   Ipv4Address::ConvertFrom (m_peerAddress) << " port " << m_peerPort << " (pkt enviados " << m_sent << ")");
+                   Ipv4Address::ConvertFrom (m_peerAddress) << " port " << m_peerPort);
     }
   else if (Ipv6Address::IsMatchingType (m_peerAddress))
     {
       NS_LOG_INFO ("At time " << Simulator::Now ().GetSeconds () << "s client sent " << m_size << " bytes to " <<
-                   Ipv6Address::ConvertFrom (m_peerAddress) << " port " << m_peerPort << " (pkt enviados " << m_sent << ")");
+                   Ipv6Address::ConvertFrom (m_peerAddress) << " port " << m_peerPort);
     }
   else if (InetSocketAddress::IsMatchingType (m_peerAddress))
     {
       NS_LOG_INFO ("At time " << Simulator::Now ().GetSeconds () << "s client sent " << m_size << " bytes to " <<
-                   InetSocketAddress::ConvertFrom (m_peerAddress).GetIpv4 () << " port " << InetSocketAddress::ConvertFrom (m_peerAddress).GetPort () << " (pkt enviados " << m_sent << ")");
+                   InetSocketAddress::ConvertFrom (m_peerAddress).GetIpv4 () << " port " << InetSocketAddress::ConvertFrom (m_peerAddress).GetPort ());
     }
   else if (Inet6SocketAddress::IsMatchingType (m_peerAddress))
     {
       NS_LOG_INFO ("At time " << Simulator::Now ().GetSeconds () << "s client sent " << m_size << " bytes to " <<
-                   Inet6SocketAddress::ConvertFrom (m_peerAddress).GetIpv6 () << " port " << Inet6SocketAddress::ConvertFrom (m_peerAddress).GetPort () << " (pkt enviados " << m_sent << ")");
+                   Inet6SocketAddress::ConvertFrom (m_peerAddress).GetIpv6 () << " port " << Inet6SocketAddress::ConvertFrom (m_peerAddress).GetPort ());
     }
 
   if (m_sent < m_count) 
@@ -367,18 +375,17 @@ RequestResponseClient::HandleRead (Ptr<Socket> socket)
   Address from;
   while ((packet = socket->RecvFrom (from)))
     {
-      m_received++;
       if (InetSocketAddress::IsMatchingType (from))
         {
           NS_LOG_INFO ("At time " << Simulator::Now ().GetSeconds () << "s client received " << packet->GetSize () << " bytes from " <<
                        InetSocketAddress::ConvertFrom (from).GetIpv4 () << " port " <<
-                       InetSocketAddress::ConvertFrom (from).GetPort () << " (pkt received " << m_received << ")");
+                       InetSocketAddress::ConvertFrom (from).GetPort ());
         }
       else if (Inet6SocketAddress::IsMatchingType (from))
         {
           NS_LOG_INFO ("At time " << Simulator::Now ().GetSeconds () << "s client received " << packet->GetSize () << " bytes from " <<
                        Inet6SocketAddress::ConvertFrom (from).GetIpv6 () << " port " <<
-                       Inet6SocketAddress::ConvertFrom (from).GetPort () << " (pkt received " << m_received << ")");
+                       Inet6SocketAddress::ConvertFrom (from).GetPort ());
         }
     }
 }

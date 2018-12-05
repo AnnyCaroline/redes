@@ -39,6 +39,9 @@ class Packet;
 class RequestResponseClient : public Application 
 {
 public:
+  uint32_t m_sent; //!< Counter for sent packets
+  uint32_t m_received; //!< Counter for received packets  
+
   /**
    * \brief Get the type ID.
    * \return the object TypeId
@@ -85,6 +88,11 @@ public:
    * \returns The number of data bytes.
    */
   uint32_t GetDataSize (void) const;
+
+  /**
+   * Get the number of packets sent
+   */
+  uint32_t GetPacketsSent (void) const;
 
   /**
    * Set the data fill of the packet (what is sent as data to the server) to 
@@ -164,8 +172,6 @@ private:
   uint32_t m_dataSize; //!< packet payload size (must be equal to m_size)
   uint8_t *m_data; //!< packet payload data
 
-  uint32_t m_sent; //!< Counter for sent packets
-  uint32_t m_received; //!< Counter for received packets
   Ptr<Socket> m_socket; //!< Socket
   Address m_peerAddress; //!< Remote peer address
   uint16_t m_peerPort; //!< Remote peer port

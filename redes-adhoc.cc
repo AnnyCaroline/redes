@@ -84,30 +84,34 @@ using namespace ns3;
 
 const int port = 9; 
 Ptr<PacketSink> raizPtr; // Ponteiro para o nó raiz
+Ptr<RequestResponseClient> rrc; //Ponteiro para o RequestResponseClient do nó 0
 uint64_t lastTotalRx = 0; // O valor para o último total de bytes recebidos
 std::ofstream myfile;
 
 
 void CalculateThroughput(){
-    //Simulator::Now obtém o tempo virtula do simulador
-    Time now = Simulator::Now ();
+    // // Simulator::Now obtém o tempo virtula do simulador
+    // Time now = Simulator::Now ();
 
-    // Converte os pacotes recebidos para MBits
-    double cur = (raizPtr->GetTotalRx() - lastTotalRx) * 8.0 / 1e6;
+    // // Converte os pacotes recebidos para MBits
+    // double cur = (raizPtr->GetTotalRx() - lastTotalRx) * 8.0 / 1e6;
     
-    // Imprime a vazão atual
-    std::cout << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
-    myfile << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
+    // // Imprime a vazão atual
+    // std::cout << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
+    // myfile << now.GetSeconds() << "s: \t" << cur << " Mbit/s" << std::endl;
     
-    lastTotalRx = raizPtr->GetTotalRx();
+    // lastTotalRx = raizPtr->GetTotalRx();
     
-    //Executará a rotina novamente depois de 1s
+    // // Executará a rotina novamente depois de 1s
+
+    // std::cout << ">> Pacotes enviados pelo nó 1: " << rrc->GetPacketsSent() << std::endl;
+
     Simulator::Schedule (MilliSeconds(1000), &CalculateThroughput);
 }
  
 int main (int argc, char *argv[]){
-    LogComponentEnable ("UdpEchoClientApplication", LOG_LEVEL_INFO);
-    //LogComponentEnable ("UdpEchoerverApplication", LOG_LEVEL_INFO);
+    LogComponentEnable ("RequestResponseClientApplication", LOG_LEVEL_INFO);
+    //LogComponentEnable ("RequestResponseerverApplication", LOG_LEVEL_INFO);
 
     uint32_t payloadSize = 1472;                /* Transport layer payload size in bytes. */
     std::string phyRate = "OfdmRate54Mbps";     /* Physical layer bitrate. */
@@ -240,38 +244,43 @@ int main (int argc, char *argv[]){
         staticRouting4->AddHostRouteTo(Ipv4Address ("192.168.1.1"), Ipv4Address ("192.168.1.1"), 1);        
     }
 
-    // UdpEchoServer no nó raiz - 0
-    UdpEchoServerHelper echoServer(port);
+    // RequestResponseServer no nó raiz - 0
+    RequestResponseServerHelper echoServer(port);
     ApplicationContainer raizApp = echoServer.Install(raiz);
     raizApp.Start(Seconds(0.0));
     raizApp.Stop(Seconds(simulationTime));
 
-    PacketSinkHelper sinkHelper ("ns3::TcpSocketFactory", InetSocketAddress (Ipv4Address::GetAny(), 9));
-    ApplicationContainer sinkApp = sinkHelper.Install (raiz); //AP
-    sinkApp.Start(Seconds (0.0));
-    sinkApp.Stop(Seconds(simulationTime));
-    raizPtr = StaticCast<PacketSink>(sinkApp.Get (0));    
+    // PacketSinkHelper sinkHelper ("ns3::TcpSocketFactory", InetSocketAddress (Ipv4Address::GetAny(), 9));
+    // ApplicationContainer sinkApp = sinkHelper.Install (raiz); //AP
+    // sinkApp.Start(Seconds (0.0));
+    // sinkApp.Stop(Seconds(simulationTime));
+    // raizPtr = StaticCast<PacketSink>(sinkApp.Get (0));    
 
-    // UdpEchoClient nos nós filhos (enviando para o raiz=0)
-    UdpEchoClientHelper echoClient (interfaces.GetAddress(0), port);
+    // RequestResponseClient nos nós filhos (enviando para o raiz=0)
+    RequestResponseClientHelper echoClient (interfaces.GetAddress(0), port);
     echoClient.SetAttribute("MaxPackets", UintegerValue(2));
     echoClient.SetAttribute("Interval", TimeValue (Seconds(1.0)));
     echoClient.SetAttribute("PacketSize", UintegerValue(1024));
     ApplicationContainer filhosApp = echoClient.Install(filhos.Get(0));
     filhosApp.Start(Seconds(1.0));
     filhosApp.Stop(Seconds(simulationTime));
- 
+
+    // std::cout << filhosApp.Get(0)->GetObject<RequestResponseClient>()->GetPacketsSent() << std::endl;
+    rrc = StaticCast<RequestResponseClient>(filhosApp.Get(0));  
+
     /* Start Simulation */ 
     Simulator::Schedule(Seconds(2), &CalculateThroughput);
     Simulator::Stop(Seconds (simulationTime+1));
     Simulator::Run();
 
-    double averageThroughput = ((raizPtr->GetTotalRx () * 8) / (1e6 * (simulationTime-1)));
+    // double averageThroughput = ((raizPtr->GetTotalRx () * 8) / (1e6 * (simulationTime-1)));
 
     Simulator::Destroy ();
 
-    std::cout << "\nAverage throughput: " << averageThroughput << " Mbit/s" << std::endl;
-    myfile << "\nAverage throughput: " << averageThroughput << " Mbit/s" << std::endl;
+    std::cout << ">> Pacotes enviados pelo nó 1: " << rrc->GetPacketsSent() << std::endl;
+
+    // std::cout << "\nAverage throughput: " << averageThroughput << " Mbit/s" << std::endl;
+    // myfile << "\nAverage throughput: " << averageThroughput << " Mbit/s" << std::endl;
 
     myfile.close();
     return 0;
