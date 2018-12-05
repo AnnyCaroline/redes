@@ -54,8 +54,8 @@
 *
 *
 * Nessa simulação, todos os filhos (todos os nós menos o 0), enviam dados para o nó raiz (0).
-* Mediamos a vazão recebida em um intervalo de X.
-* O usuário pode especificar o número de nós, a configuração da árvore e o data rate.
+* São medidas a taxa de entrega de pacotes, o atraso até o nó raiz e a vazão do nó raiz.
+* O usuário pode especificar a quantidade de pacotes enviados pelos nós filhos, o tempo total da simulação, e a configuração da árvore. 
 */
  
 #include "ns3/command-line.h"
@@ -75,19 +75,16 @@
 #include "ns3/ipv4-static-routing-helper.h"
 #include "ns3/ipv4-list-routing-helper.h"
 
-#include "ns3/packet-sink.h"
-#include "ns3/packet-sink-helper.h"
+#include "ns3/core-module.h" // para o RngSeedManager 
  
-NS_LOG_COMPONENT_DEFINE ("wifi-tree");
+NS_LOG_COMPONENT_DEFINE("wifi-arvore-adhoc");
  
 using namespace ns3;
 
 const int port = 9; 
-Ptr<PacketSink> raizPtr; // Ponteiro para o nó raiz
-Ptr<RequestResponseClient> rrc; //Ponteiro para o RequestResponseClient do nó 0
+int nFilhos = 4;
 uint64_t lastTotalRx = 0; // O valor para o último total de bytes recebidos
 std::ofstream myfile;
-
 
 void CalculateThroughput(){
     // // Simulator::Now obtém o tempo virtula do simulador
@@ -104,31 +101,32 @@ void CalculateThroughput(){
     
     // // Executará a rotina novamente depois de 1s
 
-    // std::cout << ">> Pacotes enviados pelo nó 1: " << rrc->GetPacketsSent() << std::endl;
-
     Simulator::Schedule (MilliSeconds(1000), &CalculateThroughput);
 }
  
 int main (int argc, char *argv[]){
-    LogComponentEnable ("RequestResponseClientApplication", LOG_LEVEL_INFO);
-    //LogComponentEnable ("RequestResponseerverApplication", LOG_LEVEL_INFO);
+    // LogComponentEnable ("RequestResponseClientApplication", LOG_LEVEL_INFO);
+    LogComponentEnable ("RequestResponseServerApplication",  LOG_LEVEL_INFO);
 
-    uint32_t payloadSize = 1472;                /* Transport layer payload size in bytes. */
-    std::string phyRate = "OfdmRate54Mbps";     /* Physical layer bitrate. */
+    std::string phyRate = "OfdmRate6Mbps";     /* Physical layer bitrate. */
     double simulationTime = 10;                 /* Simulation time in seconds. */
     bool pcapTracing = false;                   /* PCAP Tracing is enabled or not. */
     int round = 1;
     int arvore = 1;
+    int pacotes = 1;
 
     /* Command line argument parser setup. */
     CommandLine cmd;
-    cmd.AddValue ("payloadSize", "Payload size in bytes", payloadSize);
     cmd.AddValue ("arvore", "Arvore utilizada para o teste", arvore);
+    cmd.AddValue ("pacotes", "Número de pacotes a serem enviados pelos nós filhos", pacotes);
     cmd.AddValue ("round", "Round", round);
     cmd.AddValue ("phyRate", "Physical layer bitrate", phyRate);
     cmd.AddValue ("simulationTime", "Simulation time in seconds", simulationTime);
     cmd.AddValue ("pcap", "Enable/disable PCAP Tracing", pcapTracing);
     cmd.Parse (argc, argv);
+
+    RngSeedManager::SetSeed(2018);  
+	RngSeedManager::SetRun(round); 
 
     // Define um arquivo de saída
     std::string filename="Resultado_"+std::to_string(arvore)+"_"+phyRate+"_"+std::to_string(simulationTime)+"_"+std::to_string(round);
@@ -144,30 +142,28 @@ int main (int argc, char *argv[]){
     wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
     wifiChannel.AddPropagationLoss ("ns3::FriisPropagationLossModel", "Frequency", DoubleValue (5e9));
 
-    /* Setup Physical Layer */
+    // Setup Physical Layer
     YansWifiPhyHelper wifiPhy = YansWifiPhyHelper::Default ();
     wifiPhy.SetChannel (wifiChannel.Create ());
     wifiPhy.SetErrorRateModel("ns3::YansErrorRateModel");
     wifiHelper.SetRemoteStationManager("ns3::ConstantRateWifiManager");
 
-	//Cria os nós: nodes contém [AP, STA]
-
+	// Cria os nós
     NodeContainer raiz;
     raiz.Create(1);
 
     NodeContainer filhos;
-    filhos.Create(4);
+    filhos.Create(nFilhos);
 
-    // nodes é a concatenação do container "raiz" com o "filhos"
-	NodeContainer nodes(raiz, filhos);
+	NodeContainer nodes(raiz, filhos); // Nodes é a concatenação do container "raiz" com o "filhos"
 
     NetDeviceContainer devices;
 
     wifiMac.SetType("ns3::AdhocWifiMac");
     devices = (wifiHelper.Install (wifiPhy, wifiMac, nodes));
 
-    //altera a banda
-    Config::Set ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/ChannelWidth", UintegerValue (40)); //ou 40
+    // altera a banda
+    // Config::Set ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/ChannelWidth", UintegerValue (40)); //ou 40
  
     /* Mobility model */
     MobilityHelper mobility;
@@ -248,25 +244,16 @@ int main (int argc, char *argv[]){
     RequestResponseServerHelper echoServer(port);
     ApplicationContainer raizApp = echoServer.Install(raiz);
     raizApp.Start(Seconds(0.0));
-    raizApp.Stop(Seconds(simulationTime));
-
-    // PacketSinkHelper sinkHelper ("ns3::TcpSocketFactory", InetSocketAddress (Ipv4Address::GetAny(), 9));
-    // ApplicationContainer sinkApp = sinkHelper.Install (raiz); //AP
-    // sinkApp.Start(Seconds (0.0));
-    // sinkApp.Stop(Seconds(simulationTime));
-    // raizPtr = StaticCast<PacketSink>(sinkApp.Get (0));    
+    raizApp.Stop(Seconds(simulationTime));    
 
     // RequestResponseClient nos nós filhos (enviando para o raiz=0)
     RequestResponseClientHelper echoClient (interfaces.GetAddress(0), port);
-    echoClient.SetAttribute("MaxPackets", UintegerValue(2));
+    echoClient.SetAttribute("MaxPackets", UintegerValue(pacotes));
     echoClient.SetAttribute("Interval", TimeValue (Seconds(1.0)));
     echoClient.SetAttribute("PacketSize", UintegerValue(1024));
-    ApplicationContainer filhosApp = echoClient.Install(filhos.Get(0));
+    ApplicationContainer filhosApp = echoClient.Install(filhos);
     filhosApp.Start(Seconds(1.0));
     filhosApp.Stop(Seconds(simulationTime));
-
-    // std::cout << filhosApp.Get(0)->GetObject<RequestResponseClient>()->GetPacketsSent() << std::endl;
-    rrc = StaticCast<RequestResponseClient>(filhosApp.Get(0));  
 
     /* Start Simulation */ 
     Simulator::Schedule(Seconds(2), &CalculateThroughput);
@@ -277,7 +264,27 @@ int main (int argc, char *argv[]){
 
     Simulator::Destroy ();
 
-    std::cout << ">> Pacotes enviados pelo nó 1: " << rrc->GetPacketsSent() << std::endl;
+    unsigned long int totalSent = 0, totalReceived = 0;
+    double totalRtt = 0.0, rtt = 0.0;
+    unsigned long int sent = 0, received = 0;
+
+    for(int i=0; i<nFilhos; i++){
+        sent          = filhosApp.Get(i)->GetObject<RequestResponseClient>()->GetPacketsSent();
+        received      = filhosApp.Get(i)->GetObject<RequestResponseClient>()->GetPacketsReceived();
+        rtt           = filhosApp.Get(i)->GetObject<RequestResponseClient>()->GetRtt();
+        totalSent     += sent;
+        totalReceived += received;
+        totalRtt      += rtt;
+        std::cout << " Filho " << i+1 <<" >>  enviados: " << sent << " recebidos: " << received << " rtt-somatório: " << rtt << " rtt: " << (rtt/received) << std::endl;
+    }
+
+    std::cout << "\nPkts enviados: " << totalSent << " Pkts recebidos: " << totalReceived << " RTT: " << (totalRtt/totalReceived) << std::endl;
+
+    unsigned long int raizReceived = raizApp.Get(0)->GetObject<RequestResponseServer>()->GetPacketsReceived();
+    double raizAtraso = raizApp.Get(0)->GetObject<RequestResponseServer>()->GetAtraso();
+    std::cout << "\nSomatório de todos os atrasos dos pacotes que chegam até o raiz: " << raizAtraso << std::endl;
+    std::cout << "\nPacotes recebidos pelo nó raiz: " << raizReceived << std::endl;
+    std::cout << "\nAtraso médio dos pacotes que chegam ao nó raiz: " << (raizAtraso/raizReceived) << std::endl;
 
     // std::cout << "\nAverage throughput: " << averageThroughput << " Mbit/s" << std::endl;
     // myfile << "\nAverage throughput: " << averageThroughput << " Mbit/s" << std::endl;

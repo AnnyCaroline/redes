@@ -24,6 +24,7 @@
 #include "ns3/ptr.h"
 #include "ns3/ipv4-address.h"
 #include "ns3/traced-callback.h"
+#include "ns3/TimeHeader.h"
 
 namespace ns3 {
 
@@ -39,9 +40,6 @@ class Packet;
 class RequestResponseClient : public Application 
 {
 public:
-  uint32_t m_sent; //!< Counter for sent packets
-  uint32_t m_received; //!< Counter for received packets  
-
   /**
    * \brief Get the type ID.
    * \return the object TypeId
@@ -93,6 +91,16 @@ public:
    * Get the number of packets sent
    */
   uint32_t GetPacketsSent (void) const;
+
+  /**
+   * Get the number of packets received
+   */
+  uint32_t GetPacketsReceived (void) const;
+
+  /**
+   * Get Rtt from the node
+   */
+  double GetRtt (void) const;
 
   /**
    * Set the data fill of the packet (what is sent as data to the server) to 
@@ -176,6 +184,10 @@ private:
   Address m_peerAddress; //!< Remote peer address
   uint16_t m_peerPort; //!< Remote peer port
   EventId m_sendEvent; //!< Event to send the next packet
+
+  uint32_t m_sent; //!< Counter for sent packets
+  uint32_t m_received; //!< Counter for received packets  
+  double m_rtt;  
 
   /// Callbacks for tracing the packet Tx events
   TracedCallback<Ptr<const Packet> > m_txTrace;

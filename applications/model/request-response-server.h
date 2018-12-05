@@ -23,6 +23,7 @@
 #include "ns3/event-id.h"
 #include "ns3/ptr.h"
 #include "ns3/address.h"
+#include "ns3/TimeHeader.h"
 
 namespace ns3 {
 
@@ -50,6 +51,8 @@ public:
   static TypeId GetTypeId (void);
   RequestResponseServer ();
   virtual ~RequestResponseServer ();
+  uint32_t GetPacketsReceived (void) const;
+  double GetAtraso (void) const;
 
 protected:
   virtual void DoDispose (void);
@@ -72,6 +75,8 @@ private:
   Ptr<Socket> m_socket; //!< IPv4 Socket
   Ptr<Socket> m_socket6; //!< IPv6 Socket
   Address m_local; //!< local multicast address
+  uint32_t m_received;
+  double m_atraso;
 };
 
 } // namespace ns3
