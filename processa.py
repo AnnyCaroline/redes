@@ -12,8 +12,6 @@ def mean_confidence_interval(data, confidence=0.95):
     return m, m-h, m+h
 
 a=[1,2,3,4,5,6];
-pdrs=[];
-atrs=[];
 
 filePdr = open("pdr.dat", "w")
 fileAtr = open("atr.dat", "w")
@@ -30,6 +28,8 @@ for arvore in a:
         filePdr.write("30");
         fileAtr.write("30");        
 
+    pdrs=[];
+    atrs=[];
     for i in range(1,101):    
         filename = "Anny_{0:d}_300_5000.000000_{1:d}".format(arvore,i);
         file = open(filename, 'r');
@@ -46,4 +46,4 @@ for arvore in a:
     if arvore%2==0:
         filePdr.write("\n")
         fileAtr.write("\n")
-
+    
