@@ -43,6 +43,7 @@
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/ipv4-static-routing-helper.h"
 #include "ns3/ipv4-list-routing-helper.h"
+#include "ns3/config-store.h"
 
 #include "ns3/core-module.h" // para o RngSeedManager 
  
@@ -56,12 +57,12 @@ uint64_t lastTotalRx = 0; // O valor para o último total de bytes recebidos
 std::ofstream myfile;
  
 int main (int argc, char *argv[]){
+
+
     // LogComponentEnable ("RequestResponseClientApplication", LOG_LEVEL_INFO);
     // LogComponentEnable ("RequestResponseServerApplication",  LOG_LEVEL_INFO);
 
-    std::string phyRate = "OfdmRate6Mbps";     /* Physical layer bitrate. */
     double simulationTime = 10;                 /* Simulation time in seconds. */
-    bool pcapTracing = false;                   /* PCAP Tracing is enabled or not. */
     int round = 1;
     int arvore = 1;
     int pacotes = 1;
@@ -71,9 +72,7 @@ int main (int argc, char *argv[]){
     cmd.AddValue ("arvore", "Arvore utilizada para o teste", arvore);
     cmd.AddValue ("pacotes", "Número de pacotes a serem enviados pelos nós filhos", pacotes);
     cmd.AddValue ("round", "Round", round);
-    cmd.AddValue ("phyRate", "Physical layer bitrate", phyRate);
     cmd.AddValue ("simulationTime", "Simulation time in seconds", simulationTime);
-    cmd.AddValue ("pcap", "Enable/disable PCAP Tracing", pcapTracing);
     cmd.Parse (argc, argv);
 
     RngSeedManager::SetSeed(2018);  
@@ -86,7 +85,7 @@ int main (int argc, char *argv[]){
 
     WifiMacHelper wifiMac;
     WifiHelper wifiHelper;
-    wifiHelper.SetStandard(WIFI_PHY_STANDARD_80211n_5GHZ);
+    wifiHelper.SetStandard(WIFI_PHY_STANDARD_80211b);
  
     /* Set up Legacy Channel */
     YansWifiChannelHelper wifiChannel;
@@ -97,7 +96,9 @@ int main (int argc, char *argv[]){
     YansWifiPhyHelper wifiPhy = YansWifiPhyHelper::Default ();
     wifiPhy.SetChannel (wifiChannel.Create ());
     wifiPhy.SetErrorRateModel("ns3::YansErrorRateModel");
-    wifiHelper.SetRemoteStationManager("ns3::ConstantRateWifiManager");
+    wifiHelper.SetRemoteStationManager ("ns3::ConstantRateWifiManager",
+                                "DataMode",StringValue ("DsssRate1Mbps"),
+                                "ControlMode",StringValue ("DsssRate1Mbps"));
 
     // Define nFilhos com base no tipo de árvore escolhido
     if (arvore==1 || arvore==2){
@@ -124,7 +125,26 @@ int main (int argc, char *argv[]){
 
     // altera a banda
     // Config::Set ("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/ChannelWidth", UintegerValue (40)); //ou 40
- 
+
+    // altera tamanho da fila de buffer
+    // https://www.nsnam.org/doxygen/classns3_1_1_wifi_mac_queue.html#details
+
+
+    Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/DcaTxop/$ns3::DcaTxop/Queue/$ns3::WifiMacQueue/MaxPackets", UintegerValue(3));
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/DcaTxop/$ns3::DcaTxop/Queue/$ns3::WifiMacQueue/MaxBytes", UintegerValue(0));
+    
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/VO_EdcaTxopN/$ns3::EdcaTxopN/Queue/$ns3::WifiMacQueue/MaxPackets", UintegerValue(0));
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/VO_EdcaTxopN/$ns3::EdcaTxopN/Queue/$ns3::WifiMacQueue/MaxBytes", UintegerValue(0));
+
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/VI_EdcaTxopN/$ns3::EdcaTxopN/Queue/$ns3::WifiMacQueue/MaxPackets", UintegerValue(0));
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/VI_EdcaTxopN/$ns3::EdcaTxopN/Queue/$ns3::WifiMacQueue/MaxBytes", UintegerValue(0));
+
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/BE_EdcaTxopN/$ns3::EdcaTxopN/Queue/$ns3::WifiMacQueue/MaxPackets", UintegerValue(0));
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/BE_EdcaTxopN/$ns3::EdcaTxopN/Queue/$ns3::WifiMacQueue/MaxBytes", UintegerValue(0));
+
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/BK_EdcaTxopN/$ns3::EdcaTxopN/Queue/$ns3::WifiMacQueue/MaxPackets", UintegerValue(0));
+    // Config::Set("/$ns3::NodeListPriv/NodeList/*/$ns3::Node/DeviceList/*/$ns3::WifiNetDevice/Mac/$ns3::AdhocWifiMac/BK_EdcaTxopN/$ns3::EdcaTxopN/Queue/$ns3::WifiMacQueue/MaxBytes", UintegerValue(0));
+
     /* Mobility model */
     MobilityHelper mobility;
     Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
@@ -500,6 +520,27 @@ int main (int argc, char *argv[]){
 
     // Iniciar simulação
     Simulator::Stop(Seconds (simulationTime+1));
+
+
+//   #ifdef HAVE_LIBXML2
+//     // Output config store to XML format
+//     Config::SetDefault ("ns3::ConfigStore::Filename", StringValue ("attributes.xml"));
+//     Config::SetDefault ("ns3::ConfigStore::FileFormat", StringValue ("Xml"));
+//     Config::SetDefault ("ns3::ConfigStore::Mode", StringValue ("Save"));
+//     ConfigStore outputxml;
+//     //outputxml.ConfigureDefaults ();
+//     outputxml.ConfigureAttributes ();
+//   #else
+//     // Output config store to txt format
+//     Config::SetDefault ("ns3::ConfigStore::Filename", StringValue ("attributes.txt"));
+//     Config::SetDefault ("ns3::ConfigStore::FileFormat", StringValue ("RawText"));
+//     Config::SetDefault ("ns3::ConfigStore::Mode", StringValue ("Save"));
+//     ConfigStore outputtxt;
+//     //outputtxt.ConfigureDefaults();
+//     outputtxt.ConfigureAttributes();  
+//   #endif
+
+
     Simulator::Run();
 
     Simulator::Destroy ();
@@ -529,6 +570,7 @@ int main (int argc, char *argv[]){
     std::cout << atrasoMedio << std::endl;
 
     myfile.close();
+
     return 0;
  }
 

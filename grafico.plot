@@ -10,16 +10,29 @@ set xlabel "Quantidade de nós"
 set bars 0.6
 set datafile separator ","
 
+set terminal postscript eps
 set output "pdr.eps"
-set ylabel "PDR"
+
+set title "Taxa média de entrega de pacotes"
+set ylabel "Packets Delivery Rate (%)"
 set yrange [0 : 1]
 plot 'pdr.dat' \
-		   using 2:3:4:xtic(1) ti "Desbalanceada" linecolor rgb "#FF0000" fs pattern 2, \
-        '' using 5:6:7 ti "Balanceada" lt 1 lc rgb "#0000FF" fs pattern 6
+		   using 2:3:4:xtic(1) ti "Altura máxima" linecolor rgb "#FF0000" fs pattern 2, \
+        '' using 5:6:7 ti "Completa" lt 1 lc rgb "#0000FF" fs pattern 6
 
+set terminal pngcairo
+set output "pdr.png"
+replot
+
+set title "Atraso médio"
+set terminal postscript eps
 set output "atr.eps"
-set ylabel "Atraso"
-set yrange [0 : 0.045]
+set ylabel "Atraso (segundos)"
+set yrange [0 : 0.6]
 plot 'atr.dat' \
-		   using 2:3:4:xtic(1) ti "Desbalanceada" linecolor rgb "#FF0000" fs pattern 2, \
-        '' using 5:6:7 ti "Balanceada" lt 1 lc rgb "#0000FF" fs pattern 6
+		   using 2:3:4:xtic(1) ti "Altura máxima" linecolor rgb "#FF0000" fs pattern 2, \
+        '' using 5:6:7 ti "Completa" lt 1 lc rgb "#0000FF" fs pattern 6
+
+set terminal pngcairo
+set output "atr.png"
+replot

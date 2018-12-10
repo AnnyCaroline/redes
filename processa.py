@@ -30,8 +30,8 @@ for arvore in a:
 
     pdrs=[];
     atrs=[];
-    for i in range(1,101):    
-        filename = "Anny_{0:d}_300_5000.000000_{1:d}".format(arvore,i);
+    for i in range(1,201):    
+        filename = "Anny_{0:d}_600_20000.000000_{1:d}".format(arvore,i);
         file = open(filename, 'r');
         pdrs.append(float(file.readline()));
         atrs.append(float(file.readline()));
