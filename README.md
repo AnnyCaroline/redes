@@ -13,12 +13,12 @@ A tabela a seguir apresenta a localização dos arquivos neste repositório e o 
 
 | Arq. neste repo | Local de destino                           | Descrição                                                                                                         |
 |-----------------|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
-| redes-adhoc.cc  | <pastaDeInstalacaoDoNs3>/scratch/          | arquivo principal da simulação                                                                                    |
-| run.sh          | <pastaDeInstalacaoDoNs3>/                  | script responsável por executar todas as rodadas de simulações, para todos os cenários                            |
-| processa.py     | <pastaDeInstalacaoDoNs3>/                  | calcula a média e intervalo de confiança com base nos arquivos de saída das simulações                            |
-| grafico.plot    | <pastaDeInstalacaoDoNs3>/                  | gera gráficos nos formatos .eps e .png utilizando o gnuplot com base no arquivo de médias gerado pelo processa.py |
-| applications/*  | <pastaDeInstalacaoDoNs3>/src/applications/ | aplicações Sender e Receiver                                                                                      |
-| internet/model  | <pastaDeInstalacaoDoNs3>/internet/model/   | cabeçalho desenvolvido para armazenar o momento de envio de um pacote                                             |
+| redes-adhoc.cc  | pastaDeInstalacaoDoNs3/scratch/          | arquivo principal da simulação                                                                                    |
+| run.sh          | pastaDeInstalacaoDoNs3/                  | script responsável por executar todas as rodadas de simulações, para todos os cenários                            |
+| processa.py     | pastaDeInstalacaoDoNs3/                  | calcula a média e intervalo de confiança com base nos arquivos de saída das simulações                            |
+| grafico.plot    | pastaDeInstalacaoDoNs3/                  | gera gráficos nos formatos .eps e .png utilizando o gnuplot com base no arquivo de médias gerado pelo processa.py |
+| applications/*  | pastaDeInstalacaoDoNs3/src/applications/ | aplicações Sender e Receiver                                                                                      |
+| internet/model  | pastaDeInstalacaoDoNs3/internet/model/   | cabeçalho desenvolvido para armazenar o momento de envio de um pacote                                             |
 
 ## Execução
 ```
