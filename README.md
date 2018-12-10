@@ -27,7 +27,7 @@ python processa.py
 gnuplot grafico.plot
 ```
 
-O script .sh pode demorar cerca de 3 horas para executar. Modifique-o caso queira distribuir o processamento.
+O script .sh demora para executar. Modifique-o caso queira distribuir o processamento.
 
 ## Links
 - [stackoverflow - Compute a confidence interval from sample data](https://stackoverflow.com/questions/15033511/compute-a-confidence-interval-from-sample-data)
